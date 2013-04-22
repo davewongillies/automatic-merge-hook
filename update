@@ -1,11 +1,14 @@
-#!/bin/env python
+#!/usr/bin/python
 import os
 import sys
 import subprocess
 import logging as log
-import argparse
 from itertools import dropwhile
 from pprint import pformat
+
+class Bunch:
+    def __init__(self, **kwds):
+        self.__dict__.update(kwds)
 
 def get_output(command):
     return subprocess.Popen(command.split(),stdout=subprocess.PIPE, stderr=open(os.devnull, 'w')).communicate()
@@ -33,11 +36,15 @@ def next(item, lst):
         return None
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(description='auto merge post update hook')
-    parser.add_argument('refname', metavar='refname', help='refname')
-    parser.add_argument('oldrev', metavar='oldrev', help='old revision')
-    parser.add_argument('newrev', metavar='newrev', help='new revision')
-    return parser.parse_args()
+    try:
+        import argparse
+        parser = argparse.ArgumentParser(description='auto merge post update hook')
+        parser.add_argument('refname', metavar='refname', help='refname')
+        parser.add_argument('oldrev', metavar='oldrev', help='old revision')
+        parser.add_argument('newrev', metavar='newrev', help='new revision')
+        return parser.parse_args()
+    except ImportError:
+        return Bunch(refname = sys.argv[1], oldrev = sys.argv[2], newrev = sys.argv[3])
 
 if __name__ == '__main__':
     os.environ["GIT_WORK_TREE"] = os.path.abspath(os.curdir)
