@@ -14,7 +14,6 @@ def get_output(command):
     return subprocess.Popen(command.split(),stdout=subprocess.PIPE, stderr=open(os.devnull, 'w')).communicate()
 
 def call(command):
-#    log.debug(command)
     return subprocess.call(command, shell=True)
 
 def get_branch(refname):
@@ -46,30 +45,15 @@ def parse_arguments():
     except ImportError:
         return Bunch(refname = sys.argv[1], oldrev = sys.argv[2], newrev = sys.argv[3])
 
-if __name__ == '__main__':
-    os.environ["GIT_WORK_TREE"] = os.path.abspath(os.curdir)
-    
-    branches_flow = ['2.1','2.2','2.3', 'master']
-    log.basicConfig(level=log.DEBUG)
-    head_before_start = get_output('git rev-parse --abbrev-ref HEAD')[0][:-1]
-    options = parse_arguments()
-
-    log.debug('before we start we are at: %s' % head_before_start)
-    log.debug('Parsed input parameters: %s %s %s' % (options.refname, 
-        options.oldrev, options.newrev))
-    latest = latest_branches_commits(branches_flow)
-    log.debug('Storing current HEADS of branches before we start: %s', pformat(latest))
-
-    curr_refname = options.refname
-    branches_flow = start_from(get_branch(options.refname), branches_flow)
-    log.debug('auto-merging through: %s' % branches_flow)
+def automatic_merge(head_before_start, latest, branches_flow):
+    log.debug('Auto-merging through: %s' % branches_flow)
     reset = False
     for branch in branches_flow:
         onto = next(branch, branches_flow)
         if onto:
             exitcode = call('git checkout %s && git merge refs/heads/%s' % (onto, branch))
             if exitcode:
-                log.debug('merge of %s onto %s failed, must reset to original state' % (branch, onto))
+                log.debug('Merge of %s onto %s failed, must reset to original state' % (branch, onto))
                 call('git reset --hard %s' % (latest[onto]))
                 reset = True
                 break
@@ -79,3 +63,20 @@ if __name__ == '__main__':
             call('git checkout %s && git reset --hard %s && git checkout %s' % (
                 to_reset, latest[to_reset], head_before_start))
         sys.exit('Automated merges failed, reset to original state')
+
+if __name__ == '__main__':
+    log.basicConfig(level=log.DEBUG)
+    os.environ["GIT_WORK_TREE"] = os.path.abspath(os.curdir)
+    
+    branches_flow = ['2.1','2.2','2.3', 'master']
+    head_before_start = get_output('git rev-parse --abbrev-ref HEAD')[0][:-1]
+    log.debug('Before we start we are at: %s' % head_before_start)
+
+    options = parse_arguments()
+    log.debug('Parsed input parameters: %s %s %s' % (options.refname, options.oldrev, options.newrev))
+
+    latest = latest_branches_commits(branches_flow)
+    log.debug('Storing current heads of branches before we start: %s', pformat(latest))
+
+    branches_flow = start_from(get_branch(options.refname), branches_flow)
+    automatic_merge(head_before_start, latest, branches_flow)
